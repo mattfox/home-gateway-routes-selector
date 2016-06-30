@@ -1,0 +1,31 @@
+server {
+  access_log /var/log/nginx/routes.tansen.lan.access.log;
+  error_log /var/log/nginx/routes.tansen.lan.error.log;
+  server_name routes.tansen.lan routes;
+  
+  #location / {
+  #  root /usr/local/share/routes/static;
+  #  index index.html;
+  #  autoindex on; 
+  #  disable_symlinks off;
+  #}
+  
+  #location ~ ^/(me|hosts) {
+  #  # Requests for node js service
+  #  proxy_pass http://127.0.0.1:8000;
+  #  include /etc/nginx/proxy_params;
+  #}
+  
+  location ~ ^/(js|css|fonts) {
+    root /usr/local/share/routes/static;
+    index index.html;
+    autoindex on; 
+    disable_symlinks off;
+  }
+  
+  location / {
+    # Requests for node js service
+    proxy_pass http://127.0.0.1:8000;
+    include /etc/nginx/proxy_params;
+  }
+}

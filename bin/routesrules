@@ -1,0 +1,188 @@
+#!/usr/bin/env python
+"""
+Print or update IP rules to change routing into the OpenVPN USA tunnel.
+"""
+import argparse
+import sys
+import syslog
+import json
+import netaddr
+import subprocess
+import re
+import os
+
+RULE_PRIO=100
+ROUTE_TABLE=100
+SAVE_FILE='/var/lib/misc/usaroutes.json'
+RULE_SHOW_RE = re.compile('^%s:\s+from ([0-9\.]+) lookup %s$' % (RULE_PRIO, ROUTE_TABLE))
+
+class SubprocessException(Exception):
+    pass
+
+class RuleNotFoundException(Exception):
+    # ip rule wasn't found
+    pass
+
+def add(args):
+    """
+    Add a rule for the given IP address to route into the tun device.
+    """
+    ip = str(_verify_ip(args.ip))
+    ips = _read_saved()
+    if ip not in ips:
+        ips.append(ip)
+        _write_saved(ips)
+        try:
+            _remove_rule(ip) # Ensure no duplicates
+        except RuleNotFoundException:
+            pass
+        _add_rule(ip)
+
+def remove(args):
+    """
+    Remove the rule for the given IP address to route into the tun device.
+    """
+    ip = str(_verify_ip(args.ip))
+    ips = _read_saved()
+    if ip in ips:
+        ips.remove(ip)
+        _write_saved(ips)
+        try:
+            _remove_rule(ip)
+        except RuleNotFoundException:
+            # Strange, but not a big deal since we wanted to remove it anyway.
+            pass
+
+def load(args):
+    """
+    Set rules to the list from the save file. Useful for setting routing at
+    boot.
+    """
+    current_ips = _read_rules()
+    for ip in current_ips:
+        _remove_rule(ip)
+        
+    for saved_ip in _read_saved():
+        _add_rule(saved_ip)
+
+def show(args):
+    """
+    List the IPs being routed into the tunnel.
+    """
+    ips = _read_rules()
+    if args.json:
+        sys.stdout.write('%s\n' % json.dumps(ips))
+    else:
+        for ip in ips:
+            sys.stdout.write('%s\n' % ip)
+    
+def _read_saved():
+    """
+    Return the list of IPs in the save file.
+    """
+    if not os.path.isfile(SAVE_FILE):
+        return []
+    
+    with open(SAVE_FILE, 'r') as save_file:
+        return json.loads(save_file.read())
+
+def _read_rules():
+    """
+    Return the list of IPs being routed to the special table.
+    """
+    rules_cmd = subprocess.Popen(
+        ['/sbin/ip', 'rule', 'show'],
+        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        close_fds=True,
+    )
+    (stdout, stderr) = rules_cmd.communicate()
+    rules_returncode = rules_cmd.poll()
+    if rules_returncode != 0:
+        raise SubprocessException('ip rule returned %s: %s' % (rules_returncode, stderr))
+    
+    ips = []
+    for rules_line in stdout.split('\n'):
+        matches = RULE_SHOW_RE.match(rules_line.strip())
+        if matches:
+            ips.append(matches.group(1))
+    return ips
+
+def _write_saved(ips):
+    """
+    Write the list of IPs to the save file.
+    """
+    with open(SAVE_FILE, 'w') as save_file:
+        save_file.write(json.dumps(ips))
+        save_file.write('\n')
+
+def _add_rule(ip):
+    """
+    Add a rule for the given IP address to route into the tun device.
+    """
+    syslog.syslog(syslog.LOG_INFO, 'Adding rule for %s.' % ip)
+    rules_cmd = subprocess.Popen(
+        ['/sbin/ip', 'rule', 'add', 'prio', str(RULE_PRIO), 'from', str(ip), 'lookup', str(ROUTE_TABLE)],
+        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        close_fds=True,
+    )
+    (stdout, stderr) = rules_cmd.communicate()
+    rules_returncode = rules_cmd.poll()
+    if rules_returncode != 0:
+        raise SubprocessException('ip rule returned %s: %s' % (rules_returncode, stderr))
+
+def _remove_rule(ip):
+    """
+    Remove the rule for the given IP address to route into the tun device.
+    """
+    syslog.syslog(syslog.LOG_INFO, 'Removing rule for %s.' % ip)
+    rules_cmd = subprocess.Popen(
+        ['/sbin/ip', 'rule', 'del', 'prio', str(RULE_PRIO), 'from', str(ip), 'lookup', str(ROUTE_TABLE)],
+        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        close_fds=True,
+    )
+    (stdout, stderr) = rules_cmd.communicate()
+    rules_returncode = rules_cmd.poll()
+    if rules_returncode == 254:
+        raise RuleNotFoundException()
+    if rules_returncode != 0:
+        raise SubprocessException('ip rule returned %s: %s' % (rules_returncode, stderr))
+
+def _verify_ip(ip):
+    return netaddr.IPAddress(ip)
+
+def _write_error_and_quit(err_msg, args, exit_code=1):
+    if args.json:
+        sys.stderr.write('%s\n' % json.dumps({'error': err_msg}))
+    else:
+        sys.stderr.write('%s\n' % err_msg)
+    syslog.syslog(syslog.LOG_ERR, err_msg)
+    sys.exit(exit_code)
+
+if __name__ == '__main__':
+    actions = {
+        'add': add,
+        'remove': remove,
+        'load': load,
+        'show': show,
+    }
+
+    parser = argparse.ArgumentParser(description='Show and update ip routing rules.')
+    parser.add_argument('--json', action='store_true', 
+                       help='output as json')
+    parser.add_argument('--ip', action='store', 
+                       help='ip address to add or remove')
+    parser.add_argument('action', action='store',
+                       default='show', type=str, choices=actions.keys(),
+                       help='action to take')
+    
+    args = parser.parse_args()
+    
+    syslog.syslog(syslog.LOG_DEBUG, 'Running action %s, ip %s.' % (args.action, args.ip))
+    
+    try:
+        actions.get(args.action)(args)
+    except SubprocessException, e:
+        _write_error_and_quit('Subprocess failed: %s' % str(e).strip(), args)
+    except netaddr.core.AddrFormatError:
+        _write_error_and_quit('Missing or invalid IP address: %s' % args.ip, args)
+        

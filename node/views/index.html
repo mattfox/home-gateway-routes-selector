@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Routes</title>
+
+    <!-- Bootstrap -->
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+    <link href="css/font-awesome.min.css" rel="stylesheet">
+
+  </head>
+  <body>
+    <div class="container">
+      <div class="page-header">
+        <h1>Routes</h1>
+        <p class="lead">Control routing for network devices.</p>
+      </div>
+      {% for host in hosts %}
+      <p>
+        <form method="post" action="/hosts/{{ host.ip }}/">
+        {% if host.hostname == 'office6700' %}<i class="fa fa-print fa-2x"></i>
+        {% elif host.hostname == 'Bear' %}<i class="fa fa-laptop fa-2x"></i>
+        {% elif host.hostname == 'Gorilla' %}<i class="fa fa-desktop fa-2x"></i>
+        {% elif host.hostname == 'Cheryls-Air' %}<i class="fa fa-laptop fa-2x"></i>
+        {% elif host.hostname == 'Cheryls-iPhone' %}<i class="fa fa-mobile-phone fa-2x"></i>
+        {% elif host.hostname == 'Matts-iPhone' %}<i class="fa fa-mobile-phone fa-2x"></i>
+        {% elif host.hostname == 'Matthews-iPad' %}<i class="fa fa-tablet fa-2x"></i>
+        {% elif host.hostname == 'Apple-TV' %}<i class="fa fa-film fa-2x"></i>
+        {% else %}<i class="fa fa-asterisk fa-2x"></i>
+        {% endif %}
+
+        {% if host.hostname == '*' %}{{ host.ip }}{% else %}{{ host.hostname }}{% endif %}
+        <label{% if host.route == 'can' %} style="background-color: #EE0000; color: white;"{% endif %}><input type="radio" name="route" value="can" {% if host.route == 'can' %}checked="checked"{% endif %} /> Canada</label>
+        <label{% if host.route == 'usa' %} style="background-color: #3C3B6E; color: white;"{% endif %}><input type="radio" name="route" value="usa" {% if host.route == 'usa' %}checked="checked"{% endif %} /> USA</label>
+        <input type="submit" value="Update" />
+        </form>
+      </p>
+      {% endfor %}
+    </div>
+    <!-- jQuery (necessary for Bootstrap's JavaScript plugins) -->
+    <script src="js/jquery-2.1.3.min.js"></script>
+    <!-- Include all compiled plugins (below), or include individual files as needed -->
+    <script src="js/bootstrap.min.js"></script>
+  </body>
+</html>
