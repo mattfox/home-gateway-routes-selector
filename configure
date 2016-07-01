@@ -2,13 +2,10 @@
 ROUTESAPP_DEPENDENCIES="python-netaddr"
 apt-get install $ROUTESAPP_DEPENDENCIES
 
-ln -fs `pwd`/nginx /etc/nginx/sites-available/routes
-ln -fs /etc/nginx/sites-available/routes /etc/nginx/sites-enabled/routes
+WD=`/bin/pwd`
+
 rm -rf /usr/local/share/routes/
-mkdir -p /usr/local/share/routes/
-cp -r static /usr/local/share/routes/static
-cp -r node /usr/local/share/routes/node
-cp -r bin /usr/local/share/routes/bin
+ln -fs $WD /usr/local/share/routes
 
 # Use visudo to add the following to the end of /etc/sudoers. This allows
 # the www-data user (the node process) to run the routesrules script
