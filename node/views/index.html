@@ -20,13 +20,13 @@
       {% for host in hosts %}
       <p>
         <form method="post" action="/hosts/{{ host.ip }}/">
+        <!-- TODO: make icon choices user-selectible with intelligent defaults, and make values live in DB instead of code -->
         {% if host.hostname == 'office6700' %}<i class="fa fa-print fa-2x"></i>
         {% elif host.hostname == 'Bear' %}<i class="fa fa-laptop fa-2x"></i>
         {% elif host.hostname == 'Gorilla' %}<i class="fa fa-desktop fa-2x"></i>
-        {% elif host.hostname == 'Cheryls-Air' %}<i class="fa fa-laptop fa-2x"></i>
-        {% elif host.hostname == 'Cheryls-iPhone' %}<i class="fa fa-mobile-phone fa-2x"></i>
-        {% elif host.hostname == 'Matts-iPhone' %}<i class="fa fa-mobile-phone fa-2x"></i>
-        {% elif host.hostname == 'Matthews-iPad' %}<i class="fa fa-tablet fa-2x"></i>
+        {% elif host.hostname.toLowerCase().indexOf('air') > -1 %}<i class="fa fa-laptop fa-2x"></i>
+        {% elif host.hostname.toLowerCase().indexOf('iphone') > -1 %}<i class="fa fa-mobile-phone fa-2x"></i>
+        {% elif host.hostname.toLowerCase().indexOf('ipad') > -1 %}<i class="fa fa-tablet fa-2x"></i>
         {% elif host.hostname == 'Apple-TV' %}<i class="fa fa-film fa-2x"></i>
         {% else %}<i class="fa fa-asterisk fa-2x"></i>
         {% endif %}
